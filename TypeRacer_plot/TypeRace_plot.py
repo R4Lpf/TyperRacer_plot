@@ -21,7 +21,7 @@ USERNAME = ''
 RACES = ''
 
 # CSV_OUT: (string) path to the csv file to be written to
-# Example: '/Users/kondavarsha/Documents/Python/TypeRacer_plot/output.csv'
+# Example: '/Users/porsche/Documents/Python/TypeRacer_plot/output.csv'
 CSV_OUT = ''
 
 # URL: url of the page for scraping the stats
