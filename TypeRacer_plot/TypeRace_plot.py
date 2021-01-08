@@ -33,7 +33,7 @@ csvfile = open(CSV_OUT, 'w');
 for df in dfs[1:]:
     df.to_csv(csvfile)
 
-df = df.sort_values("Speed").reset_index(drop=True)
+df = df.sort_values(["Race #","Speed"],ascending = [True,True]).reset_index(drop=True)
 trace = go.Scatter(
     y = df['Speed'],
     x = df['Race #'],
