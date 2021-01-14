@@ -6,6 +6,10 @@ This is my attempt at making a python program to plot your race history in TypeR
 Here I just changed the colorscale attribute of 'trace' from 'Magma' to 'rdylgn'
 ![newplot (2)](https://user-images.githubusercontent.com/37660959/99801639-aae08000-2b36-11eb-9994-db3b4a99063d.png)
 
+## UPDATE:
+Now you can change the the view mode of the graph to lines, markers and line&markers, a range bar was added to view the progress in a specific part of your journey and now there are a play and a pause button for the animation of your progress in parts of 100 races each.
+
+
 ## Installation
 Before you run the program install _**pandas**_ and _**plotly**_ libraries if you don't have them installed already:
 * Open up your comand promt and type:
