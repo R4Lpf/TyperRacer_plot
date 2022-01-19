@@ -5,9 +5,9 @@ Run the python program from terminal with your username:
 ```
 python TypeRace_plot.py -u "username"
 ```
--u is for your username (must be in the "username" format)
--nR is the number of Races you want to include in the plot
--sl is what you consider a slow WPM for your standards
+- -u is for your username (must be in the "username" format)
+- -nR is the number of Races you want to include in the plot
+- -sl is what you consider a slow WPM for your standards
 Example:
 ```
 python TypeRace_plot.py -u "username" -nR 4000 -sl 70
