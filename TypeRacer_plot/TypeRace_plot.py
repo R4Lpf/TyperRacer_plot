@@ -411,7 +411,7 @@ fig.update_layout(
 
 
 plotly.offline.plot(fig, filename='bruh.html', auto_open=True,auto_play=False)
-print (dfUpdate)
+
 
 
 
