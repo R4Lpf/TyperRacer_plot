@@ -10,7 +10,7 @@ python TypeRace_plot.py -u "username"
 - -sl is what you consider a slow WPM for your standards
 Example:
 ```
-python TypeRace_plot.py -u "username" -nR 4000 -sl 70
+python TypeRace_plot.py -u "username" -nR 1000 -sl 50
 ```
 ## Example plot 1:
 ![newplot (1)](https://user-images.githubusercontent.com/37660959/99654347-77302800-2a5a-11eb-8267-494e2992e9cc.png)
