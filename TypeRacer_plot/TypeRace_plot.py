@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
 """
 Created on Wed Nov 18 10:54:12 2020
-
 @author: porsche
 """
 
@@ -9,122 +7,140 @@ import pandas as pd
 from datetime import datetime,date # almost inutile
 import plotly
 import plotly.graph_objects as go
+from bs4 import BeautifulSoup as bs
+from urllib.request import Request, urlopen, FancyURLopener
+import time
+import argparse
 
-# =============================================================================
-# =============================================================================
-# # MISSING TRENDLINE, CHANGING OF FRAME MODE ON BUTTON PRESSED
-# =============================================================================
-# =============================================================================
+parser = argparse.ArgumentParser(description='Parser for user info')
+parser.add_argument("-u", "--user", type=str, help="User name (must be in a 'username' format)", default="")
+parser.add_argument("-nR", "--races", type=int, help="how many races you want to consider in the plot", default=3000)
+parser.add_argument("-sl", "--slow", type=int, help="this is what you consider a slow wpm for yourself", default=70)
 
-# Scrapes typeracer stats from typeracer.com and generates a csv file
+args = parser.parse_args()
+u = args.user
+nR = args.races
+sl = args.slow
 
-# USERNAME: (string) type racer user name (you can put the username of any typeracer player)
-USERNAME = ''
+today = date.today()
+today = today.strftime("%b. %d, %Y")
 
-# RACES: (string) this is how many races should the program shearch in you history of races
-# To see all the races i recommend a high number like 9999999 so you don't have to change it everytime you run it
-RACES = ''
+USERNAME = u
+slow = sl
 
-# CSV_OUT: (string) path to the csv file to be written to
-# Example: '/Users/r4lpf/Documents/Python/TypeRacer_plot/output.csv' (or wherever you put the master folder)
-CSV_OUT = ''
+url = "https://data.typeracer.com/pit/race_history?user={0}&universe=play&n={1}".format(USERNAME, nR)
 
-# URL: url of the page for scraping the stats
-# Example: 'https://data.typeracer.com/pit/race_history?user=slow_penguin&universe=play&n=500&cursor=&startDate='
-URL = 'https://data.typeracer.com/pit/race_history?user=' + USERNAME + '&universe=play&n=' + RACES + '&cursor=&startDate='
+def rows(url):
+    hdr = {'User-Agent': 'Mozilla/5.0'}
+    req = Request(url,headers=hdr)
+    page = urlopen(req)
+    soup = bs(page)
+    table = soup.find("div",{"class":"themeContent pit"})
+    if table != None:
+        r = table.find_all("div",{"class":"Scores__Table__Row"})
+        if r != None:
+            return r
+        
+def rowAttributes(row):
+    nRace = row.find("div",{"class":"profileTableHeaderUniverse"}).find("a").text.strip()
+    SA = row.find_all("div",{"class":"profileTableHeaderRaces"})
+    speed = SA[0].text.strip()
+    accuracy = SA[1].text.strip()
+    rankInRace = row.find("div",{"class":"profileTableHeaderPoints"}).text.strip()
+    date = row.find("div",{"class":"profileTableHeaderDate"}).text.strip()
+    if date == "today":
+        date = today
+    return nRace, speed, accuracy, rankInRace, date
 
-dfs = pd.read_html(URL, header=0)
-csvfile = open(CSV_OUT, 'w');
-for df in dfs[1:]:
-    df.to_csv(csvfile)
+def fillDictionary(history = dict()):
+    R = rows(url)
+    for r in R:
+        attr = rowAttributes(r)
+        nRace = int(attr[0])
+        speed = attr[1]
+        accuracy = attr[2]
+        rankInRace = attr[3]
+        date = attr[4]
+        history[nRace] = {}
+        history[nRace]["speed"] = speed
+        history[nRace]["accuracy"] = accuracy
+        history[nRace]["rankInRace"] = rankInRace
+        history[nRace]["date"] = date
+    return history
 
-mesi = {
-    '01' : 'Jan.',
-    '02' : 'Feb.',
-    '03' : 'Mar.',
-    '04' : 'Apr.',
-    '05' : 'May',
-    '06' : 'Jun.',
-    '07' : 'Jul.',
-    '08' : 'Aug.',
-    '09' : 'Sep.',
-    '10' : 'Oct.',
-    '11' : 'Nov.',
-    '12' : 'Dec.'
-    }
-
-def today(d): 
-    if d == 'today':
-        t = datetime.today().strftime('%Y-%m-%d').split("-")
-        return mesi[t[1]]+' '+t[2]+','+' '+t[0]
-    else:
-        return d
+d = fillDictionary()
 
 
 
-df["Date"] = df["Date"].apply(lambda d : today(d))
+#dfUpdate = pd.read_csv("RaceHistory.csv")
 
-# =============================================================================
-# DF_CONTROL is a DataFrame with control values having 
-# m as the maximum WPM and l as the lowest WPM 
-# I create this control dataframe because I was having trouble with the sorting
-# I probably just made a TYPO but i cannot be arsed to find it so i did this
-# =============================================================================
-largest_race_number = int(df['Race #'].max())
-m = int(df['Speed'].max().replace(" WPM",""))+3
-l = int(df['Speed'].min().replace(" WPM",""))-1   
-
-df_control = pd.DataFrame({
-    "Race #":[float('nan') for x in range(l,m)],#This just places the control values on the far left of the graph
-    "Speed":[str(x)+" WPM" for x in range(l,m)],
-    "Accuracy":["100.0%" for x in range(l,m)],
-    "Points":[0 for x in range(l,m)],
-    "Place":[0 for x in range(l,m)],
-    "Date":["Jan. 1, 1999" for x in range(l,m)]
+try:
+    dfUpdate = pd.read_csv("RaceHistory.csv")
+except:
+    newData = pd.DataFrame(data=d).T
+    newData.to_csv("RaceHistory.csv") 
     
-    }
-)
-df = df.sort_values(["Race #","Speed"],ascending = [True,True]).reset_index(drop=True)
+dfUpdate = pd.read_csv("RaceHistory.csv")
 
-df = df_control.append(df,ignore_index=True,sort=True)
+dfUpdate = dfUpdate.set_index("Unnamed: 0")
 
-#Now i have all the data that i need to complete the plot of the history type racer
+for i in d:
+    if i not in dfUpdate.index:
+        #print(i,"non sono dentro")
+        da_aggiungere = {i:d[i]}
+        dfDA = pd.DataFrame(data = da_aggiungere).T
+        dfUpdate = dfUpdate.append(dfDA)
+    else:
+        continue
+        #print(i,"sono dentro")
+        
+dfUpdate = dfUpdate.sort_index()
+df = dfUpdate
+
+largest_race_number = int(df.index.max())
+m = int(df['speed'].max().replace(" WPM",""))+3
+l = int(df['speed'].min().replace(" WPM",""))-1  
 
 
 fig = go.Figure(
     data = go.Scatter(
-    x=df['Race #'].where(df['Race #']>=0),
-    y = df['Speed'],
-    mode = 'markers',
-    marker = dict(
-        size = 8,
-        sizemode='area',
-        sizeref=1,
-        color=[eval(x[:-1]) for x in df['Accuracy']], #set color equal to a variable
-        colorscale= 'rdylgn', # one of plotly colorscales
-        showscale=True,
-        colorbar=dict(title="<b>Accuracy</b>")   #<b> and </b> is to change the title to bold
-        ),
-    line=dict(
-        color='gold',
-        width=0.5
-        ),
-    showlegend=False,
-    
-    text = df[['Date','Accuracy']],
-    hovertemplate =
-        '<b>%{text[0]}</b>'+
-        '<br><i>Speed</i>: <b>%{y}</b></br>'+ 
-        '<i>Accuracy</i>: <b>%{text[1]}</b>'+ 
-        '<br>Race #: <b>%{x}</b><extra></extra></br>',
-    ),
-    
+                x=df.index,
+                y = df['speed'].apply(lambda x: int(x.replace("WPM",""))),
+                mode = 'markers',
+                marker = dict(
+                    size = 8,
+                    sizemode='area',
+                    sizeref=1,
+                    color=[eval(x[:-1]) for x in df['accuracy']], #set color equal to a variable
+                    colorscale= 'rdylgn', # one of plotly colorscales
+                    showscale=True,
+                    colorbar=dict(title="<b>Accuracy</b>")   #<b> and </b> is to change the title to bold
+                    ),
+                line=dict(
+                    color='gold',
+                    width=0.5
+                    ),
+                showlegend=False,   
+                text = df[['date','accuracy']],
+                hovertemplate =
+                    '<b>%{text[0]}</b>'+
+                    '<br><i>Speed</i>: <b>%{y}</b></br>'+ 
+                    '<i>Accuracy</i>: <b>%{text[1]}</b>'+ 
+                    '<br>Race #: <b>%{x}</b><extra></extra></br>',
+                ),
+                
     layout = dict(
         title = '<b>Speed in Races over time</b>',
         yaxis = dict(zeroline = True,
         title="<b>Speed (WPM)</b>"),
-        xaxis = dict(zeroline = True,
-        title="<b>Race #</b>"),
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# # #         xaxis = dict(zeroline = True,
+# # #         title="<b>Race #</b>"),
+# =============================================================================
+# =============================================================================
+# =============================================================================
         sliders = []
         ),
     #INSIDE "frames" the initial idea was to put inside it:
@@ -132,6 +148,9 @@ fig = go.Figure(
     frames = [] #In the end the content of frames is put later.
     
 )
+
+fig.update_yaxes(ticksuffix=" WPM")
+
     
 
 # =============================================================================
@@ -140,12 +159,12 @@ fig = go.Figure(
 # is slower than "slow"
 # =============================================================================
 
-slow = 55  #You can change this value however you like it to be just remember it is 
+  #You can change this value however you like it to be just remember it is 
            #the lower boundary where below it red lines start appearing
 
 fig.add_scattergl(
-    x=df['Race #'].where(df['Race #']>=0), 
-    y=df['Speed'].where(df['Speed'] < str(slow) + " WPM"), 
+    x=df.index, 
+    y=df['speed'].apply(lambda x: int(x.replace("WPM",""))).where(df['speed'].apply(lambda x: int(x.replace("WPM","")))<slow), 
     mode = 'markers',
     line=dict(
         color='red',
@@ -155,7 +174,7 @@ fig.add_scattergl(
         size = 8,
         sizemode='area',
         sizeref=1,
-        color=[eval(x[:-1]) for x in df['Accuracy']], #set color equal to a variable
+        color=[eval(x[:-1]) for x in df['accuracy']], #set color equal to a variable
         colorscale= 'rdylgn', # one of plotly colorscales
         ),
     showlegend=False
@@ -168,8 +187,8 @@ fig.add_scattergl(
 # =============================================================================
 
 fig.add_scattergl(
-    x=df['Race #'].where(df['Race #']>=0), 
-    y=df['Speed'].where(df['Speed'] >= str(slow)+" WPM"), 
+    x=df.index, 
+    y=df['speed'].apply(lambda x: int(x.replace("WPM",""))).where(df['speed'].apply(lambda x: int(x.replace("WPM","")))>=slow), 
     mode = 'markers',
     line=dict(
         color='green',
@@ -179,7 +198,7 @@ fig.add_scattergl(
         size = 8,
         sizemode='area',
         sizeref=1,
-        color=[eval(x[:-1]) for x in df['Accuracy']], #set color equal to a variable
+        color=[eval(x[:-1]) for x in df['accuracy']], #set color equal to a variable
         colorscale= 'rdylgn', # one of plotly colorscales
         ),
     showlegend=False
@@ -195,10 +214,10 @@ fig["frames"] = [
         go.Frame(
             data=[
                 go.Scatter(
-                    x = df['Race #'].where((df['Race #']>=x-101) & (df['Race #']<x)),
-                    y = df['Speed'],
+                    x = df.index.where((df.index>=x-501) & (df.index<x)),
+                    y = df['speed'].apply(lambda x: int(x.replace("WPM",""))),
                     mode = 'markers',
-                    text = df[['Date','Accuracy']],
+                    text = df[['date','accuracy']],
                     hovertemplate =
                         '<b>%{text[0]}</b>'+
                         '<br><i>Speed</i>: <b>%{y}</b></br>'+ 
@@ -210,10 +229,10 @@ fig["frames"] = [
                     )
                 ),  
                 go.Scatter(
-                    x = df['Race #'].where((df['Race #']>=x-101) & (df['Race #']<x)),
-                    y = df['Speed'].where(df['Speed'] < str(slow) + " WPM"),
+                    x = df.index.where((df.index>=x-501) & (df.index<x)),
+                    y = df['speed'].apply(lambda x: int(x.replace("WPM",""))).where(df['speed'].apply(lambda x: int(x.replace("WPM","")))<slow),
                     mode = 'markers',
-                    text = df[['Date','Accuracy']],
+                    text = df[['date','accuracy']],
                     hovertemplate =
                         '<b>%{text[0]}</b>'+
                         '<br><i>Speed</i>: <b>%{y}</b></br>'+ 
@@ -225,10 +244,10 @@ fig["frames"] = [
                     ) 
                 ),
                 go.Scatter(
-                    x = df['Race #'].where((df['Race #']>=x-101) & (df['Race #']<x)),
-                    y = df['Speed'].where(df['Speed'] > str(slow) + " WPM"),
+                    x = df.index.where((df.index>=x-501) & (df.index<x)),
+                    y = df['speed'].apply(lambda x: int(x.replace("WPM",""))).where(df['speed'].apply(lambda x: int(x.replace("WPM","")))>=slow),
                     mode = 'markers',
-                    text = df[['Date','Accuracy']],
+                    text = df[['date','accuracy']],
                     hovertemplate =
                         '<b>%{text[0]}</b>'+
                         '<br><i>Speed</i>: <b>%{y}</b></br>'+ 
@@ -242,16 +261,16 @@ fig["frames"] = [
                 
             ]
                  
-        ) for x in range(101,largest_race_number+100,100)]
+        ) for x in range(501,largest_race_number+100,500)]
 
 fig["frames"] = fig['frames'] + tuple([
     go.Frame(
         data = [
             go.Scatter(
-                    x = df['Race #'].where(df['Race #']>=0),
-                    y = df['Speed'],
+                    x = df.index,
+                    y = df['speed'].apply(lambda x: int(x.replace("WPM",""))),
                     mode = 'markers',
-                    text = df[['Date','Accuracy']],
+                    text = df[['date','accuracy']],
                     hovertemplate =
                         '<b>%{text[0]}</b>'+
                         '<br><i>Speed</i>: <b>%{y}</b></br>'+ 
@@ -263,10 +282,10 @@ fig["frames"] = fig['frames'] + tuple([
                     )
                 ),
             go.Scatter(
-                    x = df['Race #'].where(df['Race #']>=0),
-                    y = df['Speed'].where(df['Speed'] < str(slow) + " WPM"),
+                    x = df.index,
+                    y = df['speed'].apply(lambda x: int(x.replace("WPM",""))).where(df['speed'].apply(lambda x: int(x.replace("WPM","")))<slow),
                     mode = 'markers',
-                    text = df[['Date','Accuracy']],
+                    text = df[['date','accuracy']],
                     hovertemplate =
                         '<b>%{text[0]}</b>'+
                         '<br><i>Speed</i>: <b>%{y}</b></br>'+ 
@@ -278,10 +297,10 @@ fig["frames"] = fig['frames'] + tuple([
                     )
                 ),
             go.Scatter(
-                    x = df['Race #'].where(df['Race #']>=0),
-                    y = df['Speed'].where(df['Speed'] >= str(slow) + " WPM"),
+                    x = df.index,
+                    y = df['speed'].apply(lambda x: int(x.replace("WPM",""))).where(df['speed'].apply(lambda x: int(x.replace("WPM","")))>=slow),
                     mode = 'markers',
-                    text = df[['Date','Accuracy']],
+                    text = df[['date','accuracy']],
                     hovertemplate =
                         '<b>%{text[0]}</b>'+
                         '<br><i>Speed</i>: <b>%{y}</b></br>'+ 
@@ -349,7 +368,7 @@ fig.update_layout(
                 r = 10,
                 t = 100
             ),
-            x = 0.1,
+            x = -0.02,
             xanchor = "right",
             y = 0,
             yanchor = "top",
@@ -379,7 +398,7 @@ fig.update_layout(
 #     RANGE SLIDER inside first update_layout
 # =============================================================================
     xaxis=dict(
-        range = [-10,largest_race_number+10],
+        range = [0,largest_race_number+10],
         rangeslider=dict(
         visible=True
         ),
@@ -392,3 +411,8 @@ fig.update_layout(
 
 
 plotly.offline.plot(fig, filename='bruh.html', auto_open=True,auto_play=False)
+print (dfUpdate)
+
+
+
+
