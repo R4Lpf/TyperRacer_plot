@@ -1,5 +1,8 @@
 # TyperRacer History Plot
-This is my attempt at making a python program to plot your race history in TypeRacer to have a clearer picture
+This is my attempt at making a python program to plot your race history in TypeRacer to have a clear picture of your progress
+# Run
+Just run the python file in a directory and it will automatically create a csv and a html file.
+You can keep the csv file to make it run significantly faster the next time you use the program.
 ## Example plot 1:
 ![newplot (1)](https://user-images.githubusercontent.com/37660959/99654347-77302800-2a5a-11eb-8267-494e2992e9cc.png)
 ## Example plot 2: 
